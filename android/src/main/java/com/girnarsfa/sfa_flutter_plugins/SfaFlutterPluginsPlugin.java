@@ -45,7 +45,6 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 
-import io.flutter.Log;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -107,11 +106,8 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                 }
             }).onSameThread().check();
         } else if (call.method.equals("getCurrentLocation")) {
-            progressDialog = new ProgressDialog(activity, R.style.MyTheme);
-            progressDialog.setCancelable(true);
-            progressDialog.show();
-//            isReplied=false;
-//            requestLocation();
+            isReplied=false;
+            requestLocation();
         } else if (call.method.equals("downLoadFileFromUrl")) {
             HashMap<String, String> map = (HashMap<String, String>) call.arguments;
 
@@ -222,14 +218,14 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                     @Override
                     public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
                         token.continuePermissionRequest();
-                        Log.e("DDDDDD", "SHOULD BE SHOWN");
+
                     }
                 })
                 .
                         withErrorListener(new PermissionRequestErrorListener() {
                             @Override
                             public void onError(DexterError error) {
-                                Log.e("DDDDDD", "ERROR");
+
                             }
                         })
                 .onSameThread()
@@ -287,7 +283,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                         switch (status.getStatusCode()) {
                             case LocationSettingsStatusCodes.SUCCESS:
                                 //Gps is on. We can call for latest location.
-                                Log.e("DDDDDD", "SUCCESS");
+
                                 progressDialog = new ProgressDialog(activity, R.style.MyTheme);
                                 progressDialog.setCancelable(true);
                                 progressDialog.show();
@@ -295,7 +291,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
 
                                 break;
                             case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
-                                Log.e("DDDDDD", "RESOLUTION");
+
                                 //Gps is off. Automatically check and show popup to turn on Gps.
                                 try {
                                     status.startResolutionForResult(activity, GPS_SETTING);
@@ -304,7 +300,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                                 }
                                 break;
                             case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
-                                Log.e("DDDDDD", "UNAVAILABLE");
+
                                 //Gps is off. Can not show popup to turn on Gps.
                                 break;
                         }
@@ -452,9 +448,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
         } else if (requestCode == GPS_SETTING) {
             if (resultCode == RESULT_OK) {
                 getMyLocation();
-                Log.e("DDDDDD", "IF RESULT");
             } else {
-                Log.e("DDDDDD", "ELSE RESULT");
                 result.notImplemented();
             }
 
