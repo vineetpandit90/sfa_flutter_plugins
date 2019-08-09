@@ -3,10 +3,12 @@ package com.girnarsfa.sfa_flutter_plugins;
 import android.Manifest;
 import android.app.Activity;
 import android.app.DownloadManager;
+import android.app.ProgressDialog;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentSender;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.location.Location;
@@ -15,11 +17,9 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.provider.Settings;
-import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.appcompat.app.AlertDialog;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
@@ -45,6 +45,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 
+import io.flutter.Log;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -62,13 +63,12 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
     public static final int SELECT_PICTURE = 1111;
     public static final int CAMERA_REQUEST = 2222;
     public static final int GPS_SETTING = 3333;
-    public static final int ALL_PERMISSION_CODE = 4444;
-    public static final int LOCATION_CODE = 5555;
-    public static final int STORAGE_CODE = 6666;
     Activity activity;
     MethodChannel methodChannel;
     Result result;
     GoogleApiClient googleApiClient;
+    private ProgressDialog progressDialog;
+    private boolean isReplied = false;
 
     SfaFlutterPluginsPlugin(Activity activity, MethodChannel methodChannel) {
         this.activity = activity;
@@ -90,7 +90,6 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
     public void onMethodCall(MethodCall call, Result result) {
         this.result = result;
         if (call.method.equals("requestAllPermission")) {
-            Log.e("DDDD", "DDDD");
 
 
             Dexter.withActivity(activity)
@@ -108,11 +107,19 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                 }
             }).onSameThread().check();
         } else if (call.method.equals("getCurrentLocation")) {
-            requestLocation();
+            progressDialog = new ProgressDialog(activity, R.style.MyTheme);
+            progressDialog.setCancelable(true);
+            progressDialog.show();
+//            isReplied=false;
+//            requestLocation();
         } else if (call.method.equals("downLoadFileFromUrl")) {
             HashMap<String, String> map = (HashMap<String, String>) call.arguments;
 
             requestDownLoadFile(map.get("urlPath"), map.get("title"), map.get("description"), map.get("folderName"));
+        } else if (call.method.equals("shareMessage")) {
+            shareCreateChooser(call.arguments);
+        } else if (call.method.equals("shareOnGmail")) {
+            shareOnGmail(call.arguments);
         } else if (call.method.equals("getImage")) {
             requestGalleryCamera((int) call.arguments);
         } else if (call.method.equals("getDifference")) {
@@ -150,29 +157,29 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
     }
 
     private void showAlertForPermission() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
-        builder.setCancelable(false);
-        builder.setMessage("Please grant required permissions in Application Settings under Permissions")
-                .setCancelable(false)
-                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int id) {
-                        dialog.cancel();
-                        Intent intent = new Intent();
-                        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                        Uri uri = Uri.fromParts("package", activity.getPackageName(), null);
-                        intent.setData(uri);
-                        activity.startActivity(intent);
-                    }
-                })
-                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        dialog.cancel();
-                    }
-                });
-        AlertDialog alert = builder.create();
-        alert.setTitle("Permission Required");
-        alert.show();
+//        AlertDialog.Builder builder = new AlertDialog.Builder(activity);
+//        builder.setCancelable(false);
+//        builder.setMessage("Please grant required permissions in Application Settings under Permissions")
+//                .setCancelable(false)
+//                .setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+//                    public void onClick(DialogInterface dialog, int id) {
+//                        dialog.cancel();
+        Intent intent = new Intent();
+        intent.setAction(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+        Uri uri = Uri.fromParts("package", activity.getPackageName(), null);
+        intent.setData(uri);
+        activity.startActivity(intent);
+//                    }
+//                })
+//                .setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+//                    @Override
+//                    public void onClick(DialogInterface dialog, int which) {
+//                        dialog.cancel();
+//                    }
+//                });
+//        AlertDialog alert = builder.create();
+//        alert.setTitle("Permission Required");
+//        alert.show();
     }
 
     public void requestLocation() {
@@ -215,13 +222,14 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                     @Override
                     public void onPermissionRationaleShouldBeShown(List<PermissionRequest> permissions, PermissionToken token) {
                         token.continuePermissionRequest();
+                        Log.e("DDDDDD", "SHOULD BE SHOWN");
                     }
                 })
                 .
                         withErrorListener(new PermissionRequestErrorListener() {
                             @Override
                             public void onError(DexterError error) {
-
+                                Log.e("DDDDDD", "ERROR");
                             }
                         })
                 .onSameThread()
@@ -241,12 +249,31 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                 LocationServices.FusedLocationApi.requestLocationUpdates(googleApiClient, locationRequest, new LocationListener() {
                     @Override
                     public void onLocationChanged(Location location) {
-                        Log.e("DDDDD", "location accuracy" + location.getAccuracy());
-                        if (location.getAccuracy() < 40) {
-                            Log.e("DDDDD", "fine location" + location.getAccuracy());
-                            if (googleApiClient != null && googleApiClient.isConnected()) {
-                                googleApiClient.disconnect();
+
+                        if (location != null) {
+                            if (location.getAccuracy() < 40 && result != null && !isReplied) {
+                                HashMap<String, Double> locationMap = new HashMap<>();
+                                locationMap.put("latitude", location.getLatitude());
+                                locationMap.put("longitude", location.getLongitude());
+                                if (progressDialog != null && progressDialog.isShowing()) {
+                                    progressDialog.dismiss();
+                                    progressDialog = null;
+                                }
+                                try {
+                                    isReplied = true;
+                                    result.success(locationMap);
+                                    result = null;
+                                    googleApiClient.disconnect();
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    isReplied = true;
+                                    result.notImplemented();
+                                    result = null;
+                                }
+
                             }
+                        } else {
+
                         }
                     }
                 });
@@ -260,10 +287,15 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                         switch (status.getStatusCode()) {
                             case LocationSettingsStatusCodes.SUCCESS:
                                 //Gps is on. We can call for latest location.
+                                Log.e("DDDDDD", "SUCCESS");
+                                progressDialog = new ProgressDialog(activity, R.style.MyTheme);
+                                progressDialog.setCancelable(true);
+                                progressDialog.show();
 
 
                                 break;
                             case LocationSettingsStatusCodes.RESOLUTION_REQUIRED:
+                                Log.e("DDDDDD", "RESOLUTION");
                                 //Gps is off. Automatically check and show popup to turn on Gps.
                                 try {
                                     status.startResolutionForResult(activity, GPS_SETTING);
@@ -272,6 +304,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                                 }
                                 break;
                             case LocationSettingsStatusCodes.SETTINGS_CHANGE_UNAVAILABLE:
+                                Log.e("DDDDDD", "UNAVAILABLE");
                                 //Gps is off. Can not show popup to turn on Gps.
                                 break;
                         }
@@ -318,7 +351,7 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                 .check();
     }
 
-    public void requestDownLoadFile(final String path, final String title, final String description,  final String folderName) {
+    public void requestDownLoadFile(final String path, final String title, final String description, final String folderName) {
         Dexter.withActivity(activity)
                 .withPermissions(Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 .withListener(new MultiplePermissionsListener() {
@@ -331,11 +364,11 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
                             DownloadManager.Request request = new DownloadManager.Request(Download_Uri);
                             request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI | DownloadManager.Request.NETWORK_MOBILE);
                             request.setAllowedOverRoaming(false);
-                            request.setTitle(title+"-"+folderName+System.currentTimeMillis());
+                            request.setTitle(title + "-" + folderName + System.currentTimeMillis());
                             request.setDescription(description);
                             request.setVisibleInDownloadsUi(true);
                             request.setNotificationVisibility(VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, title+"-"+folderName+System.currentTimeMillis()+".pdf");
+                            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, title + "-" + folderName + System.currentTimeMillis() + ".pdf");
                             downloadManager.enqueue(request);
 
 
@@ -416,11 +449,85 @@ public class SfaFlutterPluginsPlugin implements MethodCallHandler, PluginRegistr
             File finalFile = new File(getRealPathFromURI(tempUri));
             String imagePath = finalFile.getAbsolutePath();
             result.success(imagePath);
-        } else if (requestCode == GPS_SETTING && resultCode == RESULT_OK) {
-            getMyLocation();
+        } else if (requestCode == GPS_SETTING) {
+            if (resultCode == RESULT_OK) {
+                getMyLocation();
+                Log.e("DDDDDD", "IF RESULT");
+            } else {
+                Log.e("DDDDDD", "ELSE RESULT");
+                result.notImplemented();
+            }
+
         }
         return false;
     }
 
+    private void shareCreateChooser(Object arguments) {
+        HashMap<String, String> argsMap = (HashMap<String, String>) arguments;
+        String title = argsMap.get("title");
+        String subject = argsMap.get("subject");
+
+        String message = argsMap.get("message");
+        String emailarray = argsMap.get("emailArray");
+        String email = argsMap.get("email");
+
+        String str = "";
+        if (emailarray != null && emailarray.trim().length() > 0) {
+            str = emailarray;
+        } else if (email != null && email.trim().length() > 0) {
+            str = email;
+        } else {
+            str = "";
+        }
+
+
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.putExtra(Intent.EXTRA_EMAIL, new String[]{str});
+        intent.putExtra(Intent.EXTRA_SUBJECT, subject);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, message);
+        activity.startActivity(Intent.createChooser(intent, title));
+    }
+
+    private void shareOnGmail(Object arguments) {
+        HashMap<String, String> argsMap = (HashMap<String, String>) arguments;
+        String title = argsMap.get("title");
+        String subject = argsMap.get("subject");
+
+        String message = argsMap.get("message");
+        String emailarray = argsMap.get("emailArray");
+        String email = argsMap.get("email");
+
+        String str = "";
+        if (emailarray != null && emailarray.trim().length() > 0) {
+            str = emailarray;
+        } else if (email != null && email.trim().length() > 0) {
+            str = email;
+        } else {
+            str = "";
+        }
+
+
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.putExtra(Intent.EXTRA_EMAIL, new String[]{str});
+        intent.putExtra(Intent.EXTRA_SUBJECT, subject);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TEXT, message);
+        activity.startActivity(Intent.createChooser(intent, title));
+
+
+        final PackageManager pm = activity.getPackageManager();
+        final List<ResolveInfo> matches = pm.queryIntentActivities(intent, 0);
+        ResolveInfo best = null;
+        for (final ResolveInfo info : matches) {
+            if (info.activityInfo.packageName.endsWith(".gm") || info.activityInfo.name.toLowerCase().contains("gmail")) {
+                best = info;
+            }
+        }
+        if (best != null) {
+            intent.setClassName(best.activityInfo.packageName, best.activityInfo.name);
+        }
+        activity.startActivity(intent);
+    }
 
 }

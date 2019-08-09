@@ -13,9 +13,17 @@ class SfaFlutterPlugins {
     return image;
   }
 
-  static Future<Map> get getCurrentLocation async {
-    final Map map = await _channel.invokeMethod('getCurrentLocation');
-    return map;
+  static Future<Position> get getCurrentLocation async {
+    try {
+      final Map map = await _channel.invokeMethod('getCurrentLocation');
+      Position position = new Position();
+      position.latitude = map['latitude'];
+      position.longitude = map['longitude'];
+      return position;
+    } catch (e) {
+      print(e);
+      return null;
+    }
   }
 
   static Future<Map> requestAllPermission() async {
@@ -34,15 +42,63 @@ class SfaFlutterPlugins {
     return distance;
   }
 
-  static void downLoadPdf(String url, String title, String description,
-       String folderName) async {
+  static void shareIntent(
+      {String title = '',
+      String subject = '',
+      String email = '',
+      List<String> emailList,
+      String message = ''}) async {
+    Map map = {
+      'title': title,
+      'subject': subject,
+      'email': email != null ? email : '',
+      'emailArray': emailList != null ? emailList.toString().replaceAll('[', '').replaceAll(']', '') : '',
+      'message': message,
+    };
+    _channel.invokeMethod('shareMessage', map);
+  }
+
+  static void shareOnGmail(
+      {String title = '',
+      String subject = '',
+      String email = '',
+      List<String> emailList,
+      String message = ''}) async {
+    Map map = {
+      'title': title,
+      'subject': subject,
+      'email': email != null ? email : '',
+      'emailArray': emailList != null ? emailList.toString().replaceAll('[', '').replaceAll(']', '') : '',
+      'message': message,
+    };
+    _channel.invokeMethod('shareOnGmail', map);
+  }
+
+  static void downLoadPdf(
+      String url, String title, String description, String folderName) async {
     Map map = {
       'urlPath': url,
       'title': title,
       'description': description,
       'folderName': folderName,
     };
-     await _channel.invokeMethod('downLoadFileFromUrl', map);
+    await _channel.invokeMethod('downLoadFileFromUrl', map);
+  }
+}
 
+class Position {
+  double _latitude = 0;
+  double _longitude = 0;
+
+  double get latitude => _latitude;
+
+  set latitude(double value) {
+    _latitude = value;
+  }
+
+  double get longitude => _longitude;
+
+  set longitude(double value) {
+    _longitude = value;
   }
 }

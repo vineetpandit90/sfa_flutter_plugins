@@ -1,8 +1,8 @@
 name: sfa_flutter_plugins
 description: A new Flutter plugin.
-version: 0.0.1
-author:
-homepage:
+version: 0.0.15
+author: vineet <vineetpandit90@gmail.com>
+homepage: https://github.com/vineetpandit90/sfa_flutter_plugins.git
 
 environment:
   sdk: ">=2.1.0 <3.0.0"
